@@ -263,7 +263,7 @@ THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxFPS, CGFloat);
     }
     vm_deallocate(mach_task_self(), (vm_offset_t)threadList, threadCount * sizeof(thread_t));
     
-    return MIN(totalCpu, 100.0);
+	return totalCpu;
 }
 
 #pragma mark - Memory
