@@ -20,7 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#import <Foundation/Foundation.h>
+@import Foundation;
+@import UIKit;
 
 /**
  `DBFPSCalculator` is a simple class that calculates the current frames per second value.

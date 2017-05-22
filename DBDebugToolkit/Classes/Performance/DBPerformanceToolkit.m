@@ -23,7 +23,11 @@
 //#define PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY 1
 
 #import "DBPerformanceToolkit.h"
+
+#if HAS_WIDGET
 #import "NSBundle+DBDebugToolkit.h"
+#endif
+
 #import "DBFPSCalculator.h"
 #import <mach/mach.h>
 
@@ -39,7 +43,10 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
 @property (nonatomic, strong) dispatch_queue_t measurementsTimerQueue;
 @property (nonatomic, strong) dispatch_source_t measurementsTimer;
 
+#if HAS_WIDGET
 @property (nonatomic, strong) DBPerformanceWidgetView *widget;
+#endif
+
 @property (nonatomic, strong) DBFPSCalculator *fpsCalculator;
 
 @property (nonatomic, strong) NSArray *cpuMeasurements;
@@ -64,10 +71,17 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
 
 #pragma mark - Initialization
 
-- (instancetype)initWithWidgetDelegate:(id<DBPerformanceWidgetViewDelegate>)widgetDelegate {
+#if HAS_WIDGET
+- (instancetype)initWithWidgetDelegate:(id<DBPerformanceWidgetViewDelegate>)widgetDelegate
+#else
+- (instancetype)init
+#endif
+{
     self = [super init];
     if (self) {
+#if HAS_WIDGET
         [self setupPerformanceWidgetWithDelegate:widgetDelegate];
+#endif
         [self setupPerformanceMeasurement];
     }
     
@@ -78,6 +92,8 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
 //	dispatch_
     self.measurementsTimer = nil;
 }
+
+#if HAS_WIDGET
 
 #pragma mark - Performance widget
 
@@ -128,6 +144,8 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
     [keyWindow bringSubviewToFront:self.widget];
 }
 
+#endif
+
 #pragma mark - Performance Measurement
 
 - (void)setupPerformanceMeasurement {
@@ -177,7 +195,9 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
 		self.minFPS = MIN(_minFPS, _currentFPS);
 		self.maxFPS = MAX(_maxFPS, _currentFPS);
 		
+#if HAS_WIDGET
 		[self refreshWidget];
+#endif
 		self.currentMeasurementIndex = MIN(DBPerformanceToolkitMeasurementsCount, self.currentMeasurementIndex + 1);
 #if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
 	});

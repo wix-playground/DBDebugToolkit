@@ -20,8 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#import <Foundation/Foundation.h>
+@import Foundation;
+@import UIKit;
+#if __has_include("DBPerformanceWidgetView.h")
 #import "DBPerformanceWidgetView.h"
+#define HAS_WIDGET 1
+#endif
 
 @class DBPerformanceToolkit;
 
@@ -49,6 +53,7 @@
  */
 @property (nonatomic, weak) id <DBPerformanceToolkitDelegate> delegate;
 
+#if HAS_WIDGET
 /**
  Created widget showing current CPU usage, memory usage and frames per second value.
  */
@@ -58,6 +63,7 @@
  Boolean determining whether the widget should be shown or not.
  */
 @property (nonatomic, assign) BOOL isWidgetShown;
+#endif
 
 ///----------
 /// @name CPU
@@ -130,18 +136,23 @@
 /// @name Initialization
 ///---------------------
 
+#if HAS_WIDGET
 /**
  Initializes `DBPerformanceToolkit` object with provided delegate, that will be informed about widget taps.
  
  @param widgetDelegate A delegate for the performance widget. It has to conform to `DBPerformanceWidgetViewDelegate` protocol.
  */
-- (instancetype)initWithWidgetDelegate:(id <DBPerformanceWidgetViewDelegate>)widgetDelegate;
+- (instancetype)initWithWidgetDelegate:(id <DBPerformanceWidgetViewDelegate>)widgetDelegate NS_DESIGNATED_INITIALIZER;
+#else
+- (instancetype)init NS_DESIGNATED_INITIALIZER;
+#endif
 
 /**
  Simulates the memory warning.
  */
 - (void)simulateMemoryWarning;
 
+#if HAS_WIDGET
 /**
  Updates the widget with new key window.
  
@@ -155,6 +166,7 @@
  @param window The window that resigned key. It should have the widget removed.
  */
 - (void)windowDidResignKey:(UIWindow *)window;
+#endif
 
 /**
  Returns time in seconds between the measurements.
