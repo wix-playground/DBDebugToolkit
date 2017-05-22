@@ -250,16 +250,15 @@ THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxFPS, CGFloat);
     
     for (int threadIndex = 0; threadIndex < threadCount; threadIndex++) {
         mach_msg_type_number_t threadInfoCount = THREAD_INFO_MAX;
-        if (thread_info(threadList[threadIndex], THREAD_BASIC_INFO, (thread_info_t)threadInfo, &threadInfoCount) != KERN_SUCCESS) {
+        if (thread_info(threadList[threadIndex], THREAD_EXTENDED_INFO, (thread_info_t)threadInfo, &threadInfoCount) != KERN_SUCCESS) {
             return -1;
         }
         
-        thread_basic_info_t threadBasicInfo = (thread_basic_info_t)threadInfo;
+        thread_extended_info_t threadBasicInfo = (thread_extended_info_t)threadInfo;
         
-        if (!(threadBasicInfo->flags & TH_FLAGS_IDLE)) {
-            totalCpu = totalCpu + threadBasicInfo->cpu_usage / (float)TH_USAGE_SCALE * 100.0;
+        if (!(threadBasicInfo->pth_flags & TH_FLAGS_IDLE)) {
+            totalCpu = totalCpu + threadBasicInfo->pth_cpu_usage / (float)TH_USAGE_SCALE * 100.0;
         }
-        
     }
     vm_deallocate(mach_task_self(), (vm_offset_t)threadList, threadCount * sizeof(thread_t));
     
