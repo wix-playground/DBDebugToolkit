@@ -22,9 +22,21 @@
 
 #import <Foundation/Foundation.h>
 
+@class DBURLProtocol;
+
+@protocol DBURLProtocolDelegate <NSObject>
+
+- (void)urlProtocol:(DBURLProtocol*)protocol didStartRequest:(NSURLRequest*)request uniqueIdentifier:(NSString*)uniqueIdentifier;
+- (void)urlProtocol:(DBURLProtocol*)protocol didFinishWithResponse:(NSURLResponse*)response data:(NSData*)data error:(NSError*)error forRequestWithUniqueIdentifier:(NSString*)uniqueIdentifier;
+
+@end
+
+
 /**
  `DBURLProtocol` is a `NSURLProtocol` subclass that is used for logging all the requests sent by the application.
  */
 @interface DBURLProtocol : NSURLProtocol
+
+@property (nonatomic, weak, class) id<DBURLProtocolDelegate> delegate;
 
 @end

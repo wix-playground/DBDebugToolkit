@@ -109,7 +109,7 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkTick)];
     [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 	
-	if([UIApplication sharedApplication].applicationState == UIApplicationStateActive)
+	if([UIApplication sharedApplication] && [UIApplication sharedApplication].applicationState == UIApplicationStateActive)
 	{
 		dispatch_resume(self.backgroundTimer);
 	}

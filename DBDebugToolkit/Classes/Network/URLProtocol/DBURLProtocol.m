@@ -21,11 +21,16 @@
 // THE SOFTWARE.
 
 #import "DBURLProtocol.h"
+#if __has_include("DBNetworkToolkit.h")
 #import "DBNetworkToolkit.h"
 #import "DBRequestOutcome.h"
+#define HAS_NETWORKTOOLKIT 1
+#endif
 #import "DBAuthenticationChallengeSender.h"
 
 static NSString *const DBURLProtocolHandledKey = @"DBURLProtocolHandled";
+static NSString *const DBURLProtocolUniqueIdentifierKey = @"DBURLProtocolUniqueIdentifierKey";
+static __weak id<DBURLProtocolDelegate> __protocolDelelgate;
 
 @interface DBURLProtocol () <NSURLSessionDelegate>
 
@@ -35,15 +40,27 @@ static NSString *const DBURLProtocolHandledKey = @"DBURLProtocolHandled";
 
 @implementation DBURLProtocol
 
++ (id<DBURLProtocolDelegate>)delegate
+{
+	return __protocolDelelgate;
+}
+
++ (void)setDelegate:(id<DBURLProtocolDelegate>)delegate
+{
+	__protocolDelelgate = delegate;
+}
+
 + (BOOL)canInitWithTask:(NSURLSessionTask *)task {
     NSURLRequest *request = task.currentRequest;
     return request == nil ? NO : [self canInitWithRequest:request];
 }
 
 + (BOOL)canInitWithRequest:(NSURLRequest *)request {
+#if HAS_NETWORKTOOLKIT
     if (![DBNetworkToolkit sharedInstance].loggingEnabled) {
         return NO;
     }
+#endif
     
     if ([[self propertyForKey:DBURLProtocolHandledKey inRequest:request] boolValue]) {
         return NO;
@@ -57,10 +74,18 @@ static NSString *const DBURLProtocolHandledKey = @"DBURLProtocolHandled";
 }
 
 - (void)startLoading {
+#if HAS_NETWORKTOOLKIT
     [[DBNetworkToolkit sharedInstance] saveRequest:self.request];
+#endif
+	NSString* uniqueIdentifier = [NSProcessInfo processInfo].globallyUniqueString;
     NSMutableURLRequest *request = [[DBURLProtocol canonicalRequestForRequest:self.request] mutableCopy];
-    
-    [DBURLProtocol setProperty:@YES forKey:DBURLProtocolHandledKey inRequest:request];
+	
+	request.cachePolicy = NSURLRequestReloadIgnoringCacheData;
+	
+	[DBURLProtocol setProperty:@YES forKey:DBURLProtocolHandledKey inRequest:request];
+	[DBURLProtocol setProperty:uniqueIdentifier forKey:DBURLProtocolUniqueIdentifierKey inRequest:request];
+	
+	[DBURLProtocol.delegate urlProtocol:self didStartRequest:request uniqueIdentifier:uniqueIdentifier];
     
     if (!self.urlSession) {
         self.urlSession = [NSURLSession sessionWithConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]
@@ -71,10 +96,14 @@ static NSString *const DBURLProtocolHandledKey = @"DBURLProtocolHandled";
     [[self.urlSession dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
         
         if (error != nil) {
+#if HAS_NETWORKTOOLKIT
             [self finishWithOutcome:[DBRequestOutcome outcomeWithError:error]];
+#endif
             [self.client URLProtocol:self didFailWithError:error];
         } else {
+#if HAS_NETWORKTOOLKIT
             [self finishWithOutcome:[DBRequestOutcome outcomeWithResponse:response data:data]];
+#endif
         }
         
         if (response != nil) {
@@ -84,6 +113,8 @@ static NSString *const DBURLProtocolHandledKey = @"DBURLProtocolHandled";
         if (data != nil) {
             [self.client URLProtocol:self didLoadData:data];
         }
+		
+		[DBURLProtocol.delegate urlProtocol:self didFinishWithResponse:response data:data error:error forRequestWithUniqueIdentifier:uniqueIdentifier];
         
         [self.client URLProtocolDidFinishLoading:self];
     }] resume];
@@ -93,9 +124,11 @@ static NSString *const DBURLProtocolHandledKey = @"DBURLProtocolHandled";
     // Do nothing
 }
 
+#if HAS_NETWORKTOOLKIT
 - (void)finishWithOutcome:(DBRequestOutcome *)requestOutcome {
     [[DBNetworkToolkit sharedInstance] saveRequestOutcome:requestOutcome forRequest:self.request];
 }
+#endif
 
 #pragma mark - NSURLSessionDelegate 
 

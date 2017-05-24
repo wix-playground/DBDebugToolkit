@@ -32,7 +32,11 @@
 #import <mach/mach.h>
 
 static const NSUInteger DBPerformanceToolkitMeasurementsCount = 120;
+#if HAS_WIDGET
 const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
+#else
+const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
+#endif
 
 @interface DBPerformanceToolkit ()
 
@@ -89,8 +93,7 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
 }
 
 - (void)dealloc {
-//	dispatch_
-    self.measurementsTimer = nil;
+	dispatch_cancel(self.measurementsTimer);
 }
 
 #if HAS_WIDGET

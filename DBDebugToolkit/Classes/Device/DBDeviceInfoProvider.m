@@ -21,6 +21,7 @@
 // THE SOFTWARE.
 
 #import "DBDeviceInfoProvider.h"
+@import UIKit;
 #import <sys/utsname.h>
 
 @implementation DBDeviceInfoProvider
