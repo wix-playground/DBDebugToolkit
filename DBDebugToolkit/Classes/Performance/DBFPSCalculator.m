@@ -34,7 +34,7 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 @property (nonatomic, strong) CADisplayLink *displayLink;
 
 //Holds
-@property (nonatomic, assign) uint32_t frameCount;
+@property (nonatomic, assign) volatile uint32_t frameCount;
 
 //Background polling timer
 @property (nonatomic, strong) dispatch_queue_t fpsPollingQueue;
@@ -90,7 +90,7 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 		}
 		
 #if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
-		uint32_t frameCount = OSAtomicXor32Orig(strongSelf->_frameCount, &strongSelf->_frameCount);
+		uint32_t frameCount = atomic_fetch_xor((_Atomic uint32_t*)&(strongSelf->_frameCount), strongSelf->_frameCount);//OSAtomicXor32Orig(strongSelf->_frameCount, &strongSelf->_frameCount);
 #else
 		uint32_t frameCount = strongSelf->_frameCount;
 		strongSelf->_frameCount = 0;
@@ -121,7 +121,7 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 
 - (void)displayLinkTick {
 #if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
-	OSAtomicIncrement32((int32_t*)&_frameCount);
+	atomic_fetch_add((_Atomic uint32_t*)&_frameCount, 1);
 #else
 	_frameCount++;
 #endif
