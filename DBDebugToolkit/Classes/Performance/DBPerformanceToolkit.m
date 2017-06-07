@@ -31,6 +31,11 @@
 #import "DBFPSCalculator.h"
 #import <mach/mach.h>
 
+#import <sys/resource.h>
+
+typedef void *rusage_info_t;
+extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVAILABLE_STARTING(__MAC_10_9, __IPHONE_7_0);
+
 static const NSUInteger DBPerformanceToolkitMeasurementsCount = 120;
 #if HAS_WIDGET
 const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
@@ -65,6 +70,14 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 @property (nonatomic, assign) CGFloat currentFPS;
 @property (nonatomic, assign) CGFloat minFPS;
 @property (nonatomic, assign) CGFloat maxFPS;
+
+@property (nonatomic, strong) NSArray* diskReadsMeasurements;
+@property (nonatomic, assign) uint64_t currentDiskReads;
+@property (nonatomic, assign) uint64_t currentDiskReadsDelta;
+
+@property (nonatomic, strong) NSArray* diskWritesMeasurements;
+@property (nonatomic, assign) uint64_t currentDiskWrites;
+@property (nonatomic, assign) uint64_t currentDiskWritesDelta;
 
 @property (nonatomic, assign) NSInteger currentMeasurementIndex;
 @property (nonatomic, assign) NSInteger measurementsLimit;
@@ -160,6 +173,8 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
     self.cpuMeasurements = [NSArray array];
     self.memoryMeasurements = [NSArray array];
     self.fpsMeasurements = [NSArray array];
+	self.diskReadsMeasurements = [NSArray new];
+	self.diskWritesMeasurements = [NSArray new];
     self.fpsCalculator = [DBFPSCalculator new];
     self.minFPS = CGFLOAT_MAX;
 
@@ -197,6 +212,16 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 		self.fpsMeasurements = [self array:_fpsMeasurements byAddingMeasurement:_currentFPS];
 		self.minFPS = MIN(_minFPS, _currentFPS);
 		self.maxFPS = MAX(_maxFPS, _currentFPS);
+		
+		uint64_t dr = [self diskReads];
+		self.currentDiskReadsDelta = dr - _currentDiskReads;
+		self.currentDiskReads = dr;
+		self.diskReadsMeasurements = [self array:_diskReadsMeasurements byAddingMeasurement:_currentDiskReads];
+		
+		uint64_t dw = [self diskWrites];
+		self.currentDiskWritesDelta = dw - _currentDiskWrites;
+		self.currentDiskWrites = dw;
+		self.diskWritesMeasurements = [self array:_diskWritesMeasurements byAddingMeasurement:_currentDiskWrites];
 		
 #if HAS_WIDGET
 		[self refreshWidget];
@@ -280,7 +305,7 @@ THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxFPS, CGFloat);
         thread_extended_info_t threadBasicInfo = (thread_extended_info_t)threadInfo;
         
         if (!(threadBasicInfo->pth_flags & TH_FLAGS_IDLE)) {
-            totalCpu = totalCpu + threadBasicInfo->pth_cpu_usage / (float)TH_USAGE_SCALE * 100.0;
+            totalCpu = totalCpu + threadBasicInfo->pth_cpu_usage / (float)TH_USAGE_SCALE;
         }
     }
     vm_deallocate(mach_task_self(), (vm_offset_t)threadList, threadCount * sizeof(thread_t));
@@ -294,7 +319,7 @@ THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxFPS, CGFloat);
     struct task_basic_info taskInfo;
     mach_msg_type_number_t taskInfoCount = sizeof(taskInfo);
     kern_return_t result = task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)&taskInfo, &taskInfoCount);
-    return result == KERN_SUCCESS ? taskInfo.resident_size / 1024.0 / 1024.0 : 0;
+    return result == KERN_SUCCESS ? taskInfo.resident_size : 0;
 }
 
 - (void)simulateMemoryWarning {
@@ -311,6 +336,30 @@ THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxFPS, CGFloat);
 
 - (CGFloat)fps {
     return [self.fpsCalculator fps];
+}
+
+#pragma mark - Disk IO
+
+- (uint64_t)diskReads {
+	struct rusage_info_v3 usage_info;
+	
+	if(proc_pid_rusage([NSProcessInfo processInfo].processIdentifier, RUSAGE_INFO_V3, (rusage_info_t*)&usage_info) != KERN_SUCCESS)
+	{
+		return 0;
+	}
+	
+	return usage_info.ri_diskio_bytesread;
+}
+
+- (uint64_t)diskWrites {
+	struct rusage_info_v3 usage_info;
+	
+	if(proc_pid_rusage([NSProcessInfo processInfo].processIdentifier, RUSAGE_INFO_V3, (rusage_info_t*)&usage_info) != KERN_SUCCESS)
+	{
+		return 0;
+	}
+	
+	return usage_info.ri_diskio_byteswritten;
 }
 
 @end

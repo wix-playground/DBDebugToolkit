@@ -127,6 +127,38 @@
  */
 @property (nonatomic, readonly) CGFloat maxFPS;
 
+///-----------------
+/// @name Disk Reads
+///-----------------
+
+/**
+ An array of last measurements of the disk reads;
+ */
+@property (nonatomic, readonly) NSArray *diskReadsMeasurements;
+
+/**
+ Current disk reads
+ */
+@property (nonatomic, readonly) uint64_t currentDiskReads;
+@property (nonatomic, readonly) uint64_t currentDiskReadsDelta;
+
+
+///------------------
+/// @name Disk Writes
+///------------------
+
+/**
+ An array of last measurements of the disk writes;
+ */
+@property (nonatomic, readonly) NSArray *diskWritesMeasurements;
+
+/**
+ Current disk writes
+ */
+@property (nonatomic, readonly) uint64_t currentDiskWrites;
+@property (nonatomic, readonly) uint64_t currentDiskWritesDelta;
+
+
 /**
  The limit of memorized measurements. When reached, a new measurement will override the oldest one.
  */
