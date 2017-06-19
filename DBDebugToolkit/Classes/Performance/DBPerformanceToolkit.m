@@ -24,24 +24,20 @@
 
 #import "DBPerformanceToolkit.h"
 
-#if HAS_WIDGET
-#import "NSBundle+DBDebugToolkit.h"
-#endif
-
 #import "DBFPSCalculator.h"
 #import <mach/mach.h>
 
 #import <sys/resource.h>
 
+#import <malloc/malloc.h>
+
+@implementation DTXThreadMeasurement @end
+@implementation DTXCPUMeasurement @end
+
 typedef void *rusage_info_t;
 extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVAILABLE_STARTING(__MAC_10_9, __IPHONE_7_0);
 
-static const NSUInteger DBPerformanceToolkitMeasurementsCount = 120;
-#if HAS_WIDGET
-const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 1.0;
-#else
 const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
-#endif
 
 @interface DBPerformanceToolkit ()
 
@@ -52,35 +48,19 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 @property (nonatomic, strong) dispatch_queue_t measurementsTimerQueue;
 @property (nonatomic, strong) dispatch_source_t measurementsTimer;
 
-#if HAS_WIDGET
-@property (nonatomic, strong) DBPerformanceWidgetView *widget;
-#endif
-
 @property (nonatomic, strong) DBFPSCalculator *fpsCalculator;
 
-@property (nonatomic, strong) NSArray *cpuMeasurements;
-@property (nonatomic, assign) CGFloat currentCPU;
-@property (nonatomic, assign) CGFloat maxCPU;
+@property (nonatomic, assign) DTXCPUMeasurement* currentCPU;
 
-@property (nonatomic, strong) NSArray *memoryMeasurements;
 @property (nonatomic, assign) CGFloat currentMemory;
-@property (nonatomic, assign) CGFloat maxMemory;
 
-@property (nonatomic, strong) NSArray *fpsMeasurements;
 @property (nonatomic, assign) CGFloat currentFPS;
-@property (nonatomic, assign) CGFloat minFPS;
-@property (nonatomic, assign) CGFloat maxFPS;
 
-@property (nonatomic, strong) NSArray* diskReadsMeasurements;
 @property (nonatomic, assign) uint64_t currentDiskReads;
 @property (nonatomic, assign) uint64_t currentDiskReadsDelta;
 
-@property (nonatomic, strong) NSArray* diskWritesMeasurements;
 @property (nonatomic, assign) uint64_t currentDiskWrites;
 @property (nonatomic, assign) uint64_t currentDiskWritesDelta;
-
-@property (nonatomic, assign) NSInteger currentMeasurementIndex;
-@property (nonatomic, assign) NSInteger measurementsLimit;
 
 @end
 
@@ -88,17 +68,10 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 
 #pragma mark - Initialization
 
-#if HAS_WIDGET
-- (instancetype)initWithWidgetDelegate:(id<DBPerformanceWidgetViewDelegate>)widgetDelegate
-#else
 - (instancetype)init
-#endif
 {
     self = [super init];
     if (self) {
-#if HAS_WIDGET
-        [self setupPerformanceWidgetWithDelegate:widgetDelegate];
-#endif
         [self setupPerformanceMeasurement];
     }
     
@@ -109,59 +82,6 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 	dispatch_cancel(self.measurementsTimer);
 }
 
-#if HAS_WIDGET
-
-#pragma mark - Performance widget
-
-- (void)setupPerformanceWidgetWithDelegate:(id<DBPerformanceWidgetViewDelegate>)widgetDelegate {
-    NSBundle *bundle = [NSBundle debugToolkitBundle];
-    self.widget = [[bundle loadNibNamed:@"DBPerformanceWidgetView" owner:self options:nil] objectAtIndex:0];
-    self.widget.alpha = 0.0;
-    self.widget.delegate = widgetDelegate;
-    UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
-    [self addWidgetToWindow:keyWindow];
-}
-
-- (void)refreshWidget {
-	self.widget.cpuValueTextLayer.string = [NSString stringWithFormat:@"%.1lf%%", _currentCPU];
-	self.widget.memoryValueTextLayer.string = [NSString stringWithFormat:@"%.1lf MB", _currentMemory];
-	self.widget.fpsValueTextLayer.string = [NSString stringWithFormat:@"%.0lf", _currentFPS];
-	[self.widget.cpuValueTextLayer display];
-	[CATransaction flush];
-}
-
-- (void)setIsWidgetShown:(BOOL)isWidgetShown {
-    _isWidgetShown = isWidgetShown;
-    [UIView animateWithDuration:0.35 animations:^{
-        self.widget.alpha = isWidgetShown ? 1.0 : 0.0;
-    }];
-}
-
-- (void)addWidgetToWindow:(UIWindow *)window {
-    [window addSubview:self.widget];
-    // We observe the "layer.sublayers" property of the window to keep the widget on top.
-    [window addObserver:self
-             forKeyPath:@"layer.sublayers"
-                options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld
-                context:nil];
-}
-
-- (void)updateKeyWindow:(UIWindow *)window {
-    [self addWidgetToWindow:window];
-}
-
-- (void)windowDidResignKey:(UIWindow *)window {
-    [window removeObserver:self forKeyPath:@"layer.sublayers"];
-}
-
--(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-    // We want to keep the widget on top of all the views.
-    UIWindow *keyWindow = [UIApplication sharedApplication].keyWindow;
-    [keyWindow bringSubviewToFront:self.widget];
-}
-
-#endif
-
 #pragma mark - Performance Measurement
 
 - (void)setupPerformanceMeasurement {
@@ -169,15 +89,8 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 	self.dataAccessQueue = dispatch_queue_create("dataAccessQueue", DISPATCH_QUEUE_SERIAL);
 #endif
 	
-    self.measurementsLimit = DBPerformanceToolkitMeasurementsCount;
-    self.cpuMeasurements = [NSArray array];
-    self.memoryMeasurements = [NSArray array];
-    self.fpsMeasurements = [NSArray array];
-	self.diskReadsMeasurements = [NSArray new];
-	self.diskWritesMeasurements = [NSArray new];
     self.fpsCalculator = [DBFPSCalculator new];
-    self.minFPS = CGFLOAT_MAX;
-
+	
 	dispatch_queue_attr_t qosAttribute = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0);
 	self.measurementsTimerQueue = dispatch_queue_create("measurementsTimerQueue", qosAttribute);
 
@@ -198,93 +111,35 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 	dispatch_sync(self.dataAccessQueue, ^{
 #endif
 		// Update CPU measurements
-		self.currentCPU = [self cpu];
-		self.cpuMeasurements = [self array:_cpuMeasurements byAddingMeasurement:_currentCPU];
-		self.maxCPU = MAX(_maxCPU, _currentCPU);
+		self.currentCPU = self.cpu;
 		
 		// Update memory measurements
-		self.currentMemory = [self memory];
-		self.memoryMeasurements = [self array:_memoryMeasurements byAddingMeasurement:_currentMemory];
-		self.maxMemory = MAX(_maxMemory, _currentMemory);
+		self.currentMemory = self.memory;
 		
 		// Update FPS measurements
-		self.currentFPS = [self fps];
-		self.fpsMeasurements = [self array:_fpsMeasurements byAddingMeasurement:_currentFPS];
-		self.minFPS = MIN(_minFPS, _currentFPS);
-		self.maxFPS = MAX(_maxFPS, _currentFPS);
+		self.currentFPS = self.fps;
 		
-		uint64_t dr = [self diskReads];
+		uint64_t dr = self.diskReads;
 		self.currentDiskReadsDelta = dr - _currentDiskReads;
 		self.currentDiskReads = dr;
-		self.diskReadsMeasurements = [self array:_diskReadsMeasurements byAddingMeasurement:_currentDiskReads];
 		
-		uint64_t dw = [self diskWrites];
+		uint64_t dw = self.diskWrites;
 		self.currentDiskWritesDelta = dw - _currentDiskWrites;
 		self.currentDiskWrites = dw;
-		self.diskWritesMeasurements = [self array:_diskWritesMeasurements byAddingMeasurement:_currentDiskWrites];
 		
-#if HAS_WIDGET
-		[self refreshWidget];
-#endif
-		self.currentMeasurementIndex = MIN(DBPerformanceToolkitMeasurementsCount, self.currentMeasurementIndex + 1);
+		[self.delegate performanceToolkitDidUpdateStats:self];
 #if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
 	});
 #endif
-	[self.delegate performanceToolkitDidUpdateStats:self];
-}
-
-#if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
-#define THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(__name__, __type__) - (__type__)__name__ {\
-	__block __type__ rv;\
-	dispatch_sync(self.dataAccessQueue, ^{\
-		rv = _##__name__;\
-	});\
-	return rv;\
-}
-
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(cpuMeasurements, NSArray*);
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(currentCPU, CGFloat);
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxCPU, CGFloat);
-
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(memoryMeasurements, NSArray*);
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(currentMemory, CGFloat);
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxMemory, CGFloat);
-
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(fpsMeasurements, NSArray*);
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(currentFPS, CGFloat);
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(minFPS, CGFloat);
-THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxFPS, CGFloat);
-
-#undef THREAD_SAFE_PROPERTY_ACCESSOR_MACRO
-#endif
-
-- (NSArray *)array:(NSArray *)array byAddingMeasurement:(CGFloat)measurement {
-    NSMutableArray *newMeasurements = [array mutableCopy];
-    if (self.currentMeasurementIndex == DBPerformanceToolkitMeasurementsCount) {
-        // We reached the end of the array. We start by shifting the previous measurements.
-        for (int index = 0; index < DBPerformanceToolkitMeasurementsCount - 1; index++) {
-            newMeasurements[index] = newMeasurements[index + 1];
-        }
-        // Then we add the new measurement to the end of the array.
-        newMeasurements[DBPerformanceToolkitMeasurementsCount - 1] = @(measurement);
-    } else {
-        // If we did not reach the limit of measurements we simply add the next one.
-        [newMeasurements addObject:@(measurement)];
-    }
-    return [newMeasurements copy];
-}
-
-- (NSTimeInterval)timeBetweenMeasurements {
-    return DBPerformanceToolkitTimeBetweenMeasurements;
 }
 
 #pragma mark - CPU
 
-- (CGFloat)cpu {
+- (DTXCPUMeasurement*)cpu {
     task_info_data_t taskInfo;
     mach_msg_type_number_t taskInfoCount = TASK_INFO_MAX;
     if (task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)taskInfo, &taskInfoCount) != KERN_SUCCESS) {
-        return -1;
+        return nil;
     }
     
     thread_array_t threadList;
@@ -292,25 +147,45 @@ THREAD_SAFE_PROPERTY_ACCESSOR_MACRO(maxFPS, CGFloat);
     thread_info_data_t threadInfo;
     
     if (task_threads(mach_task_self(), &threadList, &threadCount) != KERN_SUCCESS) {
-        return -1;
+        return nil;
     }
-    float totalCpu = 0;
+    double totalCpu = 0;
+	
+	DTXCPUMeasurement* rv = [DTXCPUMeasurement new];
+	NSMutableArray* threads = [NSMutableArray new];
     
     for (int threadIndex = 0; threadIndex < threadCount; threadIndex++) {
         mach_msg_type_number_t threadInfoCount = THREAD_INFO_MAX;
         if (thread_info(threadList[threadIndex], THREAD_EXTENDED_INFO, (thread_info_t)threadInfo, &threadInfoCount) != KERN_SUCCESS) {
-            return -1;
+            return nil;
         }
         
-        thread_extended_info_t threadBasicInfo = (thread_extended_info_t)threadInfo;
-        
-        if (!(threadBasicInfo->pth_flags & TH_FLAGS_IDLE)) {
-            totalCpu = totalCpu + threadBasicInfo->pth_cpu_usage / (float)TH_USAGE_SCALE;
+        thread_extended_info_t threadExtendedInfo = (thread_extended_info_t)threadInfo;
+		
+        if (!(threadExtendedInfo->pth_flags & TH_FLAGS_IDLE)) {
+			DTXThreadMeasurement* thread = [DTXThreadMeasurement new];
+			thread.cpu = threadExtendedInfo->pth_cpu_usage / (double)TH_USAGE_SCALE;
+			thread.name = [NSString stringWithUTF8String:threadExtendedInfo->pth_name];
+			
+            totalCpu += (threadExtendedInfo->pth_cpu_usage / (double)TH_USAGE_SCALE);
+			
+			if (thread_info(threadList[threadIndex], THREAD_IDENTIFIER_INFO, (thread_info_t)threadInfo, &threadInfoCount) != KERN_SUCCESS) {
+				return nil;
+			}
+			
+			thread_identifier_info_t threadIdentifier = (thread_identifier_info_t)threadInfo;
+			
+			thread.identifier = threadIdentifier->thread_id;
+			
+			[threads addObject:thread];
         }
     }
     vm_deallocate(mach_task_self(), (vm_offset_t)threadList, threadCount * sizeof(thread_t));
-    
-	return totalCpu;
+	
+	rv.threads = threads;
+	rv.totalCPU = totalCpu;
+	
+	return rv;
 }
 
 #pragma mark - Memory

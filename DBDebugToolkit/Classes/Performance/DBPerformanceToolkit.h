@@ -22,10 +22,21 @@
 
 @import Foundation;
 @import UIKit;
-#if __has_include("DBPerformanceWidgetView.h")
-#import "DBPerformanceWidgetView.h"
-#define HAS_WIDGET 1
-#endif
+
+@interface DTXThreadMeasurement : NSObject
+
+@property (nonatomic) uint64_t identifier;
+@property (nonatomic, strong) NSString* name;
+@property (nonatomic) CGFloat cpu;
+
+@end
+
+@interface DTXCPUMeasurement : NSObject
+
+@property (nonatomic) CGFloat totalCPU;
+@property (nonatomic) NSArray<DTXThreadMeasurement*>* threads;
+
+@end
 
 @class DBPerformanceToolkit;
 
@@ -53,88 +64,36 @@
  */
 @property (nonatomic, weak) id <DBPerformanceToolkitDelegate> delegate;
 
-#if HAS_WIDGET
-/**
- Created widget showing current CPU usage, memory usage and frames per second value.
- */
-@property (nonatomic, readonly) DBPerformanceWidgetView *widget;
-
-/**
- Boolean determining whether the widget should be shown or not.
- */
-@property (nonatomic, assign) BOOL isWidgetShown;
-#endif
-
 ///----------
 /// @name CPU
 ///----------
 
 /**
- An array of last measurements of the CPU usage.
- */
-@property (nonatomic, readonly) NSArray *cpuMeasurements;
-
-/**
  Current CPU usage.
  */
-@property (nonatomic, readonly) CGFloat currentCPU;
-
-/**
- Maximal recorded CPU usage.
- */
-@property (nonatomic, readonly) CGFloat maxCPU;
+@property (nonatomic, readonly) DTXCPUMeasurement* currentCPU;
 
 ///-------------
 /// @name Memory
 ///-------------
 
 /**
- An array of last measurements of the memory usage.
- */
-@property (nonatomic, readonly) NSArray *memoryMeasurements;
-
-/**
  Current memory usage.
  */
 @property (nonatomic, readonly) CGFloat currentMemory;
-
-/**
- Maximal recorded memory usage.
- */
-@property (nonatomic, readonly) CGFloat maxMemory;
 
 ///----------
 /// @name FPS
 ///----------
 
 /**
- An array of last measurements of the frames per second value.
- */
-@property (nonatomic, readonly) NSArray *fpsMeasurements;
-
-/**
  Current frames per second value.
  */
 @property (nonatomic, readonly) CGFloat currentFPS;
 
-/**
- Minimal recorded frames per second value.
- */
-@property (nonatomic, readonly) CGFloat minFPS;
-
-/**
- Maximal recorded frames per second value.
- */
-@property (nonatomic, readonly) CGFloat maxFPS;
-
 ///-----------------
 /// @name Disk Reads
 ///-----------------
-
-/**
- An array of last measurements of the disk reads;
- */
-@property (nonatomic, readonly) NSArray *diskReadsMeasurements;
 
 /**
  Current disk reads
@@ -148,61 +107,19 @@
 ///------------------
 
 /**
- An array of last measurements of the disk writes;
- */
-@property (nonatomic, readonly) NSArray *diskWritesMeasurements;
-
-/**
  Current disk writes
  */
 @property (nonatomic, readonly) uint64_t currentDiskWrites;
 @property (nonatomic, readonly) uint64_t currentDiskWritesDelta;
 
-
-/**
- The limit of memorized measurements. When reached, a new measurement will override the oldest one.
- */
-@property (nonatomic, readonly) NSInteger measurementsLimit;
-
 ///---------------------
 /// @name Initialization
 ///---------------------
 
-#if HAS_WIDGET
-/**
- Initializes `DBPerformanceToolkit` object with provided delegate, that will be informed about widget taps.
- 
- @param widgetDelegate A delegate for the performance widget. It has to conform to `DBPerformanceWidgetViewDelegate` protocol.
- */
-- (instancetype)initWithWidgetDelegate:(id <DBPerformanceWidgetViewDelegate>)widgetDelegate NS_DESIGNATED_INITIALIZER;
-#else
 - (instancetype)init NS_DESIGNATED_INITIALIZER;
-#endif
-
 /**
  Simulates the memory warning.
  */
 - (void)simulateMemoryWarning;
-
-#if HAS_WIDGET
-/**
- Updates the widget with new key window.
- 
- @param window The new application key window.
- */
-- (void)updateKeyWindow:(UIWindow *)window;
-
-/**
- Removes the widget from the old key window.
- 
- @param window The window that resigned key. It should have the widget removed.
- */
-- (void)windowDidResignKey:(UIWindow *)window;
-#endif
-
-/**
- Returns time in seconds between the measurements.
- */
-- (NSTimeInterval)timeBetweenMeasurements;
 
 @end
