@@ -28,6 +28,8 @@
  */
 @interface DBFPSCalculator : NSObject
 
+- (instancetype)initWithInterval:(NSTimeInterval)timeInterval NS_DESIGNATED_INITIALIZER;
+
 /**
  Returns calculated frames per second.
  */

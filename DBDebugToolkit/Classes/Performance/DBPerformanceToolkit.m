@@ -37,8 +37,6 @@
 typedef void *rusage_info_t;
 extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVAILABLE_STARTING(__MAC_10_9, __IPHONE_7_0);
 
-const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
-
 @interface DBPerformanceToolkit ()
 
 #if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
@@ -70,9 +68,14 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 
 - (instancetype)init
 {
+	return [self initWithInterval:0.5];
+}
+
+- (instancetype)initWithInterval:(NSTimeInterval)timeInterval
+{
     self = [super init];
     if (self) {
-        [self setupPerformanceMeasurement];
+        [self setupPerformanceMeasurementWithInterval:timeInterval];
     }
     
     return self;
@@ -84,7 +87,7 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 
 #pragma mark - Performance Measurement
 
-- (void)setupPerformanceMeasurement {
+- (void)setupPerformanceMeasurementWithInterval:(NSTimeInterval)timeInterval {
 #if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
 	self.dataAccessQueue = dispatch_queue_create("dataAccessQueue", DISPATCH_QUEUE_SERIAL);
 #endif
@@ -95,7 +98,7 @@ const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements = 0.5;
 	self.measurementsTimerQueue = dispatch_queue_create("measurementsTimerQueue", qosAttribute);
 
 	self.measurementsTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.measurementsTimerQueue);
-	uint64_t interval = DBPerformanceToolkitTimeBetweenMeasurements * NSEC_PER_SEC;
+	uint64_t interval = timeInterval * NSEC_PER_SEC;
 	dispatch_source_set_timer(self.measurementsTimer, dispatch_walltime(NULL, 0), interval, interval / 10);
 	__weak __typeof(self) weakSelf = self;
 	

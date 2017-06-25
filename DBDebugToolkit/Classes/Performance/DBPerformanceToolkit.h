@@ -116,7 +116,7 @@
 /// @name Initialization
 ///---------------------
 
-- (instancetype)init NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithInterval:(NSTimeInterval)timeInterval NS_DESIGNATED_INITIALIZER;
 /**
  Simulates the memory warning.
  */

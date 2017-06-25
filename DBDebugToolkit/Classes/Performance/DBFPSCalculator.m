@@ -27,14 +27,13 @@
 @import Darwin;
 
 static const CGFloat DBFPSCalculatorTargetFramerate = 60.0;
-extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 
 @interface DBFPSCalculator ()
+{
+	_Atomic uint64_t _frameCount;
+}
 
 @property (nonatomic, strong) CADisplayLink *displayLink;
-
-//Holds
-@property (nonatomic, assign) volatile uint32_t frameCount;
 
 //Background polling timer
 @property (nonatomic, strong) dispatch_queue_t fpsPollingQueue;
@@ -52,10 +51,16 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 
 #pragma mark - Initialization
 
-- (instancetype)init {
+- (instancetype)init
+{
+	return [self initWithInterval:0.5];
+}
+
+- (instancetype)initWithInterval:(NSTimeInterval)timeInterval
+{
     self = [super init];
     if (self) {
-        [self setupFPSMonitoring];
+        [self setupFPSMonitoringWithInterval:timeInterval];
         [self setupNotifications];
     }
     
@@ -69,7 +74,7 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 
 #pragma mark - FPS Monitoring
 
-- (void)setupFPSMonitoring {
+- (void)setupFPSMonitoringWithInterval:(NSTimeInterval)timeInterval {
 	dispatch_queue_attr_t qosAttribute = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0);
 	self.fpsPollingQueue = dispatch_queue_create("fpsPollingQueue", qosAttribute);
 #if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
@@ -77,7 +82,7 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 #endif
 	
 	self.backgroundTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.fpsPollingQueue);
-	uint64_t interval = DBPerformanceToolkitTimeBetweenMeasurements * NSEC_PER_SEC;
+	uint64_t interval = timeInterval * NSEC_PER_SEC;
 	dispatch_source_set_timer(self.backgroundTimer, dispatch_walltime(NULL, 0), interval, interval / 10);
 	
 	__weak __typeof(self) weakSelf = self;
@@ -90,12 +95,12 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 		}
 		
 #if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
-		uint32_t frameCount = atomic_fetch_xor((_Atomic uint32_t*)&(strongSelf->_frameCount), strongSelf->_frameCount);//OSAtomicXor32Orig(strongSelf->_frameCount, &strongSelf->_frameCount);
+		uint64_t frameCount = atomic_exchange(&strongSelf->_frameCount, 0);
 #else
-		uint32_t frameCount = strongSelf->_frameCount;
+		uint64_t frameCount = strongSelf->_frameCount;
 		strongSelf->_frameCount = 0;
 #endif
-		CGFloat fps = MIN(frameCount / DBPerformanceToolkitTimeBetweenMeasurements, DBFPSCalculatorTargetFramerate);
+		CGFloat fps = MIN(frameCount / interval, DBFPSCalculatorTargetFramerate);
 
 #if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
 		dispatch_sync(strongSelf.lastKnownFPSQueue, ^{
@@ -121,7 +126,7 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 
 - (void)displayLinkTick {
 #if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
-	atomic_fetch_add((_Atomic uint32_t*)&_frameCount, 1);
+	atomic_fetch_add(&_frameCount, 1);
 #else
 	_frameCount++;
 #endif
@@ -142,7 +147,7 @@ extern const NSTimeInterval DBPerformanceToolkitTimeBetweenMeasurements;
 }
 
 - (void)applicationDidBecomeActiveNotification:(NSNotification *)notification {
-	self.frameCount = 0;
+	atomic_exchange(&_frameCount, 0);
     [self.displayLink setPaused:NO];
 	dispatch_resume(self.backgroundTimer);
 }
