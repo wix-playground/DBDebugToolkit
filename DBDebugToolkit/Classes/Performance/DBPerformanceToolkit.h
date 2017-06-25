@@ -23,6 +23,8 @@
 @import Foundation;
 @import UIKit;
 
+#import "DTXPollable.h"
+
 @interface DTXThreadMeasurement : NSObject
 
 @property (nonatomic) uint64_t identifier;
@@ -38,31 +40,11 @@
 
 @end
 
-@class DBPerformanceToolkit;
-
-/**
- A protocol used for informing about refreshing the performance data.
- */
-@protocol DBPerformanceToolkitDelegate <NSObject>
-
-/**
- Informs the delegate that there are new stats available.
- @param performanceToolkit The object that refreshed stats and can now be accessed to retrieve them.
- */
-- (void)performanceToolkitDidUpdateStats:(DBPerformanceToolkit *)performanceToolkit;
-
-@end
-
 /**
  `DBPerformanceToolkit` is a class responsible for the features seen in the `DBPerformanceTableViewController`.
  It calculates the performance stats, handles showing widget and can also simulate memory warning.
  */
-@interface DBPerformanceToolkit : NSObject
-
-/**
- Delegate that will be informed about new stats available. It needs to conform to `DBPerformanceToolkitDelegate` protocol.
- */
-@property (nonatomic, weak) id <DBPerformanceToolkitDelegate> delegate;
+@interface DBPerformanceToolkit : NSObject <DTXPollable>
 
 ///----------
 /// @name CPU
@@ -116,7 +98,6 @@
 /// @name Initialization
 ///---------------------
 
-- (instancetype)initWithInterval:(NSTimeInterval)timeInterval NS_DESIGNATED_INITIALIZER;
 /**
  Simulates the memory warning.
  */

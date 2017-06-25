@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//#define PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY 1
-
 #import "DBPerformanceToolkit.h"
 
 #import "DBFPSCalculator.h"
@@ -38,13 +36,6 @@ typedef void *rusage_info_t;
 extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVAILABLE_STARTING(__MAC_10_9, __IPHONE_7_0);
 
 @interface DBPerformanceToolkit ()
-
-#if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
-@property (nonatomic, strong) dispatch_queue_t dataAccessQueue;
-#endif
-
-@property (nonatomic, strong) dispatch_queue_t measurementsTimerQueue;
-@property (nonatomic, strong) dispatch_source_t measurementsTimer;
 
 @property (nonatomic, strong) DBFPSCalculator *fpsCalculator;
 
@@ -68,72 +59,35 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 
 - (instancetype)init
 {
-	return [self initWithInterval:0.5];
-}
-
-- (instancetype)initWithInterval:(NSTimeInterval)timeInterval
-{
     self = [super init];
     if (self) {
-        [self setupPerformanceMeasurementWithInterval:timeInterval];
+		self.fpsCalculator = [DBFPSCalculator new];
     }
-    
+	
     return self;
-}
-
-- (void)dealloc {
-	dispatch_cancel(self.measurementsTimer);
 }
 
 #pragma mark - Performance Measurement
 
-- (void)setupPerformanceMeasurementWithInterval:(NSTimeInterval)timeInterval {
-#if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
-	self.dataAccessQueue = dispatch_queue_create("dataAccessQueue", DISPATCH_QUEUE_SERIAL);
-#endif
+- (void)pollWithTimePassed:(NSTimeInterval)interval
+{
+	[self.fpsCalculator pollWithTimePassed:interval];
 	
-    self.fpsCalculator = [DBFPSCalculator new];
+	self.currentFPS = self.fpsCalculator.fps;
 	
-	dispatch_queue_attr_t qosAttribute = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0);
-	self.measurementsTimerQueue = dispatch_queue_create("measurementsTimerQueue", qosAttribute);
-
-	self.measurementsTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.measurementsTimerQueue);
-	uint64_t interval = timeInterval * NSEC_PER_SEC;
-	dispatch_source_set_timer(self.measurementsTimer, dispatch_walltime(NULL, 0), interval, interval / 10);
-	__weak __typeof(self) weakSelf = self;
+	// Update CPU measurements
+	self.currentCPU = self.cpu;
 	
-	dispatch_source_set_event_handler(self.measurementsTimer, ^{
-		[weakSelf updateMeasurements];
-	});
+	// Update memory measurements
+	self.currentMemory = self.memory;
 	
-	dispatch_resume(self.measurementsTimer);
-}
-
-- (void)updateMeasurements {
-#if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
-	dispatch_sync(self.dataAccessQueue, ^{
-#endif
-		// Update CPU measurements
-		self.currentCPU = self.cpu;
-		
-		// Update memory measurements
-		self.currentMemory = self.memory;
-		
-		// Update FPS measurements
-		self.currentFPS = self.fps;
-		
-		uint64_t dr = self.diskReads;
-		self.currentDiskReadsDelta = dr - _currentDiskReads;
-		self.currentDiskReads = dr;
-		
-		uint64_t dw = self.diskWrites;
-		self.currentDiskWritesDelta = dw - _currentDiskWrites;
-		self.currentDiskWrites = dw;
-		
-		[self.delegate performanceToolkitDidUpdateStats:self];
-#if PERFORMANCE_TOOLKIT_ENFORCE_THREAD_SAFETY
-	});
-#endif
+	uint64_t dr = self.diskReads;
+	self.currentDiskReadsDelta = dr - _currentDiskReads;
+	self.currentDiskReads = dr;
+	
+	uint64_t dw = self.diskWrites;
+	self.currentDiskWritesDelta = dw - _currentDiskWrites;
+	self.currentDiskWrites = dw;
 }
 
 #pragma mark - CPU
@@ -208,12 +162,6 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
     SEL selector = NSSelectorFromString(key);
     id object = [UIApplication sharedApplication];
     ((void (*)(id, SEL))[object methodForSelector:selector])(object, selector);
-}
-
-#pragma mark - FPS
-
-- (CGFloat)fps {
-    return [self.fpsCalculator fps];
 }
 
 #pragma mark - Disk IO

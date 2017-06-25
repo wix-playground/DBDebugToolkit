@@ -23,16 +23,16 @@
 @import Foundation;
 @import UIKit;
 
+#import "DTXPollable.h"
+
 /**
  `DBFPSCalculator` is a simple class that calculates the current frames per second value.
  */
-@interface DBFPSCalculator : NSObject
-
-- (instancetype)initWithInterval:(NSTimeInterval)timeInterval NS_DESIGNATED_INITIALIZER;
+@interface DBFPSCalculator : NSObject <DTXPollable>
 
 /**
  Returns calculated frames per second.
  */
-- (CGFloat)fps;
+@property (nonatomic, assign, readonly) CGFloat fps;
 
 @end

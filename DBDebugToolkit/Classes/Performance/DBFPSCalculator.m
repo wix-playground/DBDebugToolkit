@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#define FPS_CALCULATOR_ENFORCE_THREAD_SAFETY 1
-
 #import "DBFPSCalculator.h"
 
 @import Darwin;
@@ -31,18 +29,13 @@ static const CGFloat DBFPSCalculatorTargetFramerate = 60.0;
 @interface DBFPSCalculator ()
 {
 	_Atomic uint64_t _frameCount;
+	_Atomic BOOL _enabled;
 }
 
 @property (nonatomic, strong) CADisplayLink *displayLink;
 
-//Background polling timer
-@property (nonatomic, strong) dispatch_queue_t fpsPollingQueue;
-@property (nonatomic, strong) dispatch_source_t backgroundTimer;
-
 //Handle last known fps - must use synchronized access for thread safety
-#if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
 @property (nonatomic, strong) dispatch_queue_t lastKnownFPSQueue;
-#endif
 @property (nonatomic, assign) CGFloat lastKnownFPS;
 
 @end
@@ -53,14 +46,9 @@ static const CGFloat DBFPSCalculatorTargetFramerate = 60.0;
 
 - (instancetype)init
 {
-	return [self initWithInterval:0.5];
-}
-
-- (instancetype)initWithInterval:(NSTimeInterval)timeInterval
-{
     self = [super init];
     if (self) {
-        [self setupFPSMonitoringWithInterval:timeInterval];
+        [self setupFPSMonitoring];
         [self setupNotifications];
     }
     
@@ -74,54 +62,40 @@ static const CGFloat DBFPSCalculatorTargetFramerate = 60.0;
 
 #pragma mark - FPS Monitoring
 
-- (void)setupFPSMonitoringWithInterval:(NSTimeInterval)timeInterval {
-	dispatch_queue_attr_t qosAttribute = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0);
-	self.fpsPollingQueue = dispatch_queue_create("fpsPollingQueue", qosAttribute);
-#if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
+- (void)setupFPSMonitoring
+{
 	self.lastKnownFPSQueue = dispatch_queue_create("lastKnownFPSQueue", DISPATCH_QUEUE_SERIAL);
-#endif
-	
-	self.backgroundTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.fpsPollingQueue);
-	uint64_t interval = timeInterval * NSEC_PER_SEC;
-	dispatch_source_set_timer(self.backgroundTimer, dispatch_walltime(NULL, 0), interval, interval / 10);
-	
-	__weak __typeof(self) weakSelf = self;
-	
-	dispatch_source_set_event_handler(self.backgroundTimer, ^{
-		__strong __typeof(weakSelf) strongSelf = weakSelf;
-		if(strongSelf == nil)
-		{
-			return;
-		}
-		
-#if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
-		uint64_t frameCount = atomic_exchange(&strongSelf->_frameCount, 0);
-#else
-		uint64_t frameCount = strongSelf->_frameCount;
-		strongSelf->_frameCount = 0;
-#endif
-		CGFloat fps = MIN(frameCount / interval, DBFPSCalculatorTargetFramerate);
-
-#if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
-		dispatch_sync(strongSelf.lastKnownFPSQueue, ^{
-#endif
-			strongSelf.lastKnownFPS = fps;
-#if FPS_CALCULATOR_ENFORCE_THREAD_SAFETY
-		});
-#endif
-	});
 	
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkTick)];
     [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 	
 	if([UIApplication sharedApplication] && [UIApplication sharedApplication].applicationState == UIApplicationStateActive)
 	{
-		dispatch_resume(self.backgroundTimer);
+		atomic_store(&_enabled, YES);
 	}
 	else
 	{
 		[self.displayLink setPaused:YES];
 	}
+}
+
+- (void)pollWithTimePassed:(NSTimeInterval)interval
+{
+	if(atomic_load(&_enabled) == NO)
+	{
+		dispatch_sync(_lastKnownFPSQueue, ^{
+			self.lastKnownFPS = 0;
+		});
+		
+		return;
+	}
+		
+	uint64_t frameCount = atomic_exchange(&_frameCount, 0);
+	CGFloat fps = MIN(frameCount / interval, DBFPSCalculatorTargetFramerate);
+	
+	dispatch_sync(_lastKnownFPSQueue, ^{
+		self.lastKnownFPS = fps;
+	});
 }
 
 - (void)displayLinkTick {
@@ -149,13 +123,13 @@ static const CGFloat DBFPSCalculatorTargetFramerate = 60.0;
 - (void)applicationDidBecomeActiveNotification:(NSNotification *)notification {
 	atomic_exchange(&_frameCount, 0);
     [self.displayLink setPaused:NO];
-	dispatch_resume(self.backgroundTimer);
+	atomic_store(&_enabled, YES);
 }
 
 
 - (void)applicationWillResignActiveNotification:(NSNotification *)notification {
     [self.displayLink setPaused:YES];
-	dispatch_suspend(self.backgroundTimer);
+	atomic_store(&_enabled, NO);
 }
 
 #pragma mark - FPS 
