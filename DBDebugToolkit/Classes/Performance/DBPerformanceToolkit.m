@@ -54,14 +54,18 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 @end
 
 @implementation DBPerformanceToolkit
+{
+	BOOL _collectThreadInfo;
+}
 
 #pragma mark - Initialization
 
-- (instancetype)init
+- (instancetype)initWithCollectThreadInfo:(BOOL)collectThreadInfo
 {
     self = [super init];
     if (self) {
 		self.fpsCalculator = [DBFPSCalculator new];
+		_collectThreadInfo = collectThreadInfo;
     }
 	
     return self;
@@ -120,21 +124,24 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
         thread_extended_info_t threadExtendedInfo = (thread_extended_info_t)threadInfo;
 		
         if (!(threadExtendedInfo->pth_flags & TH_FLAGS_IDLE)) {
-			DTXThreadMeasurement* thread = [DTXThreadMeasurement new];
-			thread.cpu = threadExtendedInfo->pth_cpu_usage / (double)TH_USAGE_SCALE;
-			thread.name = [NSString stringWithUTF8String:threadExtendedInfo->pth_name];
-			
             totalCpu += (threadExtendedInfo->pth_cpu_usage / (double)TH_USAGE_SCALE);
 			
-			if (thread_info(threadList[threadIndex], THREAD_IDENTIFIER_INFO, (thread_info_t)threadInfo, &threadInfoCount) != KERN_SUCCESS) {
-				return nil;
+			if(_collectThreadInfo)
+			{
+				DTXThreadMeasurement* thread = [DTXThreadMeasurement new];
+				thread.cpu = threadExtendedInfo->pth_cpu_usage / (double)TH_USAGE_SCALE;
+				thread.name = [NSString stringWithUTF8String:threadExtendedInfo->pth_name];
+				
+				if (thread_info(threadList[threadIndex], THREAD_IDENTIFIER_INFO, (thread_info_t)threadInfo, &threadInfoCount) != KERN_SUCCESS) {
+					return nil;
+				}
+				
+				thread_identifier_info_t threadIdentifier = (thread_identifier_info_t)threadInfo;
+				
+				thread.identifier = threadIdentifier->thread_id;
+				
+				[threads addObject:thread];
 			}
-			
-			thread_identifier_info_t threadIdentifier = (thread_identifier_info_t)threadInfo;
-			
-			thread.identifier = threadIdentifier->thread_id;
-			
-			[threads addObject:thread];
         }
     }
     vm_deallocate(mach_task_self(), (vm_offset_t)threadList, threadCount * sizeof(thread_t));

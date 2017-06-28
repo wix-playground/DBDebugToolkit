@@ -46,6 +46,8 @@
  */
 @interface DBPerformanceToolkit : NSObject <DTXPollable>
 
+- (instancetype)initWithCollectThreadInfo:(BOOL)collectThreadInfo;
+
 ///----------
 /// @name CPU
 ///----------
