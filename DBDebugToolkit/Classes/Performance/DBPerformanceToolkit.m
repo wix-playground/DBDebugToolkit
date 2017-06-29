@@ -96,7 +96,8 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 
 #pragma mark - CPU
 
-- (DTXCPUMeasurement*)cpu {
+- (DTXCPUMeasurement*)cpu
+{
     task_info_data_t taskInfo;
     mach_msg_type_number_t taskInfoCount = TASK_INFO_MAX;
     if (task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)taskInfo, &taskInfoCount) != KERN_SUCCESS) {

@@ -29,13 +29,13 @@
 
 @property (nonatomic) uint64_t identifier;
 @property (nonatomic, strong) NSString* name;
-@property (nonatomic) CGFloat cpu;
+@property (nonatomic) double cpu;
 
 @end
 
 @interface DTXCPUMeasurement : NSObject
 
-@property (nonatomic) CGFloat totalCPU;
+@property (nonatomic) double totalCPU;
 @property (nonatomic) NSArray<DTXThreadMeasurement*>* threads;
 
 @end
