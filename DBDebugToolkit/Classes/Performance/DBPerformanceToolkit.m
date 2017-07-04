@@ -56,16 +56,18 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 @implementation DBPerformanceToolkit
 {
 	BOOL _collectThreadInfo;
+	BOOL _collectStackTraces;
 }
 
 #pragma mark - Initialization
 
-- (instancetype)initWithCollectThreadInfo:(BOOL)collectThreadInfo
+- (instancetype)initWithConfiguration:(DTXProfilingConfiguration *)configuration
 {
     self = [super init];
     if (self) {
 		self.fpsCalculator = [DBFPSCalculator new];
-		_collectThreadInfo = collectThreadInfo;
+		_collectThreadInfo = configuration.recordThreadInformation;
+		_collectStackTraces = configuration.collectStackTraces;
     }
 	
     return self;

@@ -24,6 +24,7 @@
 @import UIKit;
 
 #import "DTXPollable.h"
+#import "DTXProfiler.h"
 
 @interface DTXThreadMeasurement : NSObject
 
@@ -46,7 +47,7 @@
  */
 @interface DBPerformanceToolkit : NSObject <DTXPollable>
 
-- (instancetype)initWithCollectThreadInfo:(BOOL)collectThreadInfo;
+- (instancetype)initWithConfiguration:(DTXProfilingConfiguration*)configuration;
 
 ///----------
 /// @name CPU

@@ -64,7 +64,7 @@ static const CGFloat DBFPSCalculatorTargetFramerate = 60.0;
 
 - (void)setupFPSMonitoring
 {
-	self.lastKnownFPSQueue = dispatch_queue_create("lastKnownFPSQueue", DISPATCH_QUEUE_SERIAL);
+	self.lastKnownFPSQueue = dispatch_queue_create("com.wix.DTXProfilerLastKnownFPSQueue", DISPATCH_QUEUE_SERIAL);
 	
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkTick)];
     [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
