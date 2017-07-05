@@ -39,7 +39,7 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 
 @property (nonatomic, strong) DBFPSCalculator *fpsCalculator;
 
-@property (nonatomic, assign) DTXCPUMeasurement* currentCPU;
+@property (nonatomic, strong) DTXCPUMeasurement* currentCPU;
 
 @property (nonatomic, assign) CGFloat currentMemory;
 

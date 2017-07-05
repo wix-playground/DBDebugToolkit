@@ -56,7 +56,7 @@
 /**
  Current CPU usage.
  */
-@property (nonatomic, readonly) DTXCPUMeasurement* currentCPU;
+@property (nonatomic, strong, readonly) DTXCPUMeasurement* currentCPU;
 
 ///-------------
 /// @name Memory
