@@ -24,8 +24,15 @@
 
 @implementation DBBuildInfoProvider
 
-- (NSString *)applicationName {
+- (NSString *)bundleName
+{
     return [self infoDictionaryObjectForKey:(NSString *)kCFBundleNameKey];
+}
+
+- (NSString *)applicationDisplayName
+{
+	NSString* displayName = [self infoDictionaryObjectForKey:@"CFBundleDisplayName"];
+	return displayName ?: [self bundleName];
 }
 
 - (NSString *)buildVersion {
@@ -38,7 +45,7 @@
 
 - (NSString *)buildInfoString {
     NSString *buildInfoStringFormat = @"%@, v. %@ (%@)";
-    return [NSString stringWithFormat:buildInfoStringFormat, [self applicationName], [self buildVersion], [self buildNumber]];
+    return [NSString stringWithFormat:buildInfoStringFormat, [self applicationDisplayName], [self buildVersion], [self buildNumber]];
 }
 
 #pragma mark - Private methods

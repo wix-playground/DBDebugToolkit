@@ -28,9 +28,14 @@
 @interface DBBuildInfoProvider : NSObject
 
 /**
- Returns the application name string.
+ Returns the bundle name string.
  */
-- (NSString *)applicationName;
+- (NSString *)bundleName;
+
+/**
+ Returns the application display name string.
+ */
+- (NSString *)applicationDisplayName;
 
 /**
  Returns the build version string.
