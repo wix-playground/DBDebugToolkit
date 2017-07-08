@@ -22,12 +22,14 @@
 
 @import Foundation;
 @import UIKit;
+@import Darwin;
 
 #import "DTXPollable.h"
 #import "DTXProfiler.h"
 
 @interface DTXThreadMeasurement : NSObject
 
+@property (nonatomic) thread_t machThread;
 @property (nonatomic) uint64_t identifier;
 @property (nonatomic, strong) NSString* name;
 @property (nonatomic) double cpu;
@@ -38,6 +40,7 @@
 
 @property (nonatomic) double totalCPU;
 @property (nonatomic) NSArray<DTXThreadMeasurement*>* threads;
+@property (nonatomic) DTXThreadMeasurement* heaviestThread;
 
 @end
 

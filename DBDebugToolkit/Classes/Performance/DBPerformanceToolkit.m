@@ -117,6 +117,9 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 	
 	DTXCPUMeasurement* rv = [DTXCPUMeasurement new];
 	NSMutableArray* threads = [NSMutableArray new];
+	
+	double maxCPU = -1;
+	DTXThreadMeasurement* heaviestThread;
     
     for (int threadIndex = 0; threadIndex < threadCount; threadIndex++) {
         mach_msg_type_number_t threadInfoCount = THREAD_INFO_MAX;
@@ -132,6 +135,7 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 			if(_collectThreadInfo)
 			{
 				DTXThreadMeasurement* thread = [DTXThreadMeasurement new];
+				thread.machThread = threadList[threadIndex];
 				thread.cpu = threadExtendedInfo->pth_cpu_usage / (double)TH_USAGE_SCALE;
 				thread.name = [NSString stringWithUTF8String:threadExtendedInfo->pth_name];
 				
@@ -144,6 +148,12 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 				thread.identifier = threadIdentifier->thread_id;
 				
 				[threads addObject:thread];
+				
+				if(thread.cpu > maxCPU)
+				{
+					maxCPU = thread.cpu;
+					heaviestThread = thread;
+				}
 			}
         }
     }
@@ -151,6 +161,7 @@ extern int proc_pid_rusage(int pid, int flavor, rusage_info_t *buffer) __OSX_AVA
 	
 	rv.threads = threads;
 	rv.totalCPU = totalCpu;
+	rv.heaviestThread = heaviestThread;
 	
 	return rv;
 }
