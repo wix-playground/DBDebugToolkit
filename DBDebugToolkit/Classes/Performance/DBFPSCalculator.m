@@ -67,9 +67,27 @@ static const CGFloat DBFPSCalculatorTargetFramerate = 60.0;
 	self.lastKnownFPSQueue = dispatch_queue_create("com.wix.DTXProfilerLastKnownFPSQueue", DISPATCH_QUEUE_SERIAL);
 	
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkTick)];
-    [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+    [self.displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 	
-	if([UIApplication sharedApplication] && [UIApplication sharedApplication].applicationState == UIApplicationStateActive)
+	__block BOOL enabled = NO;
+	
+	void (^block)(void) = ^{
+		if([UIApplication sharedApplication] && [UIApplication sharedApplication].applicationState == UIApplicationStateActive)
+		{
+			enabled = YES;
+		}
+	};
+	
+	if(NSThread.isMainThread == YES)
+	{
+		block();
+	}
+	else
+	{
+		dispatch_sync(dispatch_get_main_queue(), block);
+	}
+	
+	if(enabled)
 	{
 		atomic_store(&_enabled, YES);
 	}
