@@ -21,11 +21,6 @@
 // THE SOFTWARE.
 
 #import "DBURLProtocol.h"
-#if __has_include("DBNetworkToolkit.h")
-#import "DBNetworkToolkit.h"
-#import "DBRequestOutcome.h"
-#define HAS_NETWORKTOOLKIT 1
-#endif
 #import "DBAuthenticationChallengeSender.h"
 
 static NSString *const DBURLProtocolHandledKey = @"DBURLProtocolHandled";
@@ -50,33 +45,33 @@ static __weak id<DBURLProtocolDelegate> __protocolDelelgate;
 	__protocolDelelgate = delegate;
 }
 
-+ (BOOL)canInitWithTask:(NSURLSessionTask *)task {
++ (BOOL)canInitWithTask:(NSURLSessionTask *)task
+{
     NSURLRequest *request = task.currentRequest;
     return request == nil ? NO : [self canInitWithRequest:request];
 }
 
-+ (BOOL)canInitWithRequest:(NSURLRequest *)request {
-#if HAS_NETWORKTOOLKIT
-    if (![DBNetworkToolkit sharedInstance].loggingEnabled) {
-        return NO;
-    }
-#endif
-    
++ (BOOL)canInitWithRequest:(NSURLRequest *)request
+{
     if ([[self propertyForKey:DBURLProtocolHandledKey inRequest:request] boolValue]) {
         return NO;
     }
+	
+	if([request.URL.scheme isEqualToString:@"data"])
+	{
+		return NO;
+	}
     
     return YES;
 }
 
-+ (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request {
++ (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request
+{
     return request;
 }
 
-- (void)startLoading {
-#if HAS_NETWORKTOOLKIT
-    [[DBNetworkToolkit sharedInstance] saveRequest:self.request];
-#endif
+- (void)startLoading
+{
 	NSString* uniqueIdentifier = [NSProcessInfo processInfo].globallyUniqueString;
     NSMutableURLRequest *request = [[DBURLProtocol canonicalRequestForRequest:self.request] mutableCopy];
 	
@@ -95,22 +90,18 @@ static __weak id<DBURLProtocolDelegate> __protocolDelelgate;
     
     [[self.urlSession dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
         
-        if (error != nil) {
-#if HAS_NETWORKTOOLKIT
-            [self finishWithOutcome:[DBRequestOutcome outcomeWithError:error]];
-#endif
+        if (error != nil)
+		{
             [self.client URLProtocol:self didFailWithError:error];
-        } else {
-#if HAS_NETWORKTOOLKIT
-            [self finishWithOutcome:[DBRequestOutcome outcomeWithResponse:response data:data]];
-#endif
         }
         
-        if (response != nil) {
+        if (response != nil)
+		{
             [self.client URLProtocol:self didReceiveResponse:response cacheStoragePolicy:NSURLCacheStorageNotAllowed];
         }
         
-        if (data != nil) {
+        if (data != nil)
+		{
             [self.client URLProtocol:self didLoadData:data];
         }
 		
